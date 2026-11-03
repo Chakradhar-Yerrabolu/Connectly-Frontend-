@@ -184,6 +184,7 @@ export function ChatView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [chatActionsOpen, setChatActionsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [searchDate, setSearchDate] = useState('');
   const [remoteResults, setRemoteResults] = useState<Message[] | null>(null);
@@ -480,81 +481,86 @@ export function ChatView({
           </small>
         </div>
 
+
         <div className="chat-header-actions">
-          <button type="button" className={`icon-button ${conversation.members.find((member) => member.user.id === me.id)?.isFavorite ? 'active' : ''}`} title="Toggle favourite" aria-label="Toggle favourite chat" onClick={async () => {
-            const favorite = !conversation.members.find((member) => member.user.id === me.id)?.isFavorite;
-            try {
-              await apiFetch(`/api/v1/conversations/${conversation.id}/favorite`, {
-                method: 'PATCH',
-                body: { favorite }
-              });
-              window.location.reload();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : 'Could not update favourite');
-            }
-          }}>
-            <Icon name="star" size={18} />
-          </button>
-
-          <button type="button" className="icon-button" title="Lock chat" aria-label="Lock chat" onClick={async () => {
-            const secret = window.prompt('Set a secret key (at least 4 characters). Enter it later in the Chats search bar to reveal this chat.');
-            if (!secret) return;
-
-            try {
-              await apiFetch(`/api/v1/conversations/${conversation.id}/lock`, {
-                method: 'POST',
-                body: { secret }
-              });
-              window.location.reload();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : 'Could not lock chat');
-            }
-          }}>
-            <Icon name="lock" size={18} />
-          </button>
-
           <button type="button" className="icon-button" onClick={() => {
-            setCallNotify(true);
-            setActiveCallId(undefined);
-            setCallMode('audio');
-          }} aria-label="Start voice call">
+            setCallNotify(true); setActiveCallId(undefined); setCallMode('audio');
+          }} aria-label="Start voice call" title="Voice call">
             <Icon name="phone" size={18} />
           </button>
-
           <button type="button" className="icon-button" onClick={() => {
-            setCallNotify(true);
-            setActiveCallId(undefined);
-            setCallMode('video');
-          }} aria-label="Start video call">
+            setCallNotify(true); setActiveCallId(undefined); setCallMode('video');
+          }} aria-label="Start video call" title="Video call">
             <Icon name="video" size={18} />
           </button>
-
-          <button type="button" className={`icon-button ${searchOpen ? 'active' : ''}`} onClick={() => setSearchOpen((open) => !open)} aria-label="Search conversation" aria-expanded={searchOpen}>
-            <Icon name="search" size={18} />
-          </button>
-
-          <button type="button" className={`icon-button ${archived ? 'active' : ''}`} onClick={onToggleArchive} aria-label={archived ? 'Unarchive conversation' : 'Archive conversation'}>
-            <Icon name="archive" size={18} />
-          </button>
-
-          <button type="button" className="icon-button" onClick={async () => {
-            if (!window.confirm('Delete this chat from your account? Other participants will keep their copy.')) return;
-
-            try {
-              await apiFetch(`/api/v1/conversations/${conversation.id}`, {
-                method: 'DELETE'
-              });
-              window.location.reload();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : 'Could not delete chat');
-            }
-          }} aria-label="Delete entire chat">
-            <Icon name="trash" size={18} />
-          </button>
-
-          <button type="button" className={`icon-button ${infoOpen ? 'active' : ''}`} onClick={onToggleInfo} aria-label="Conversation details" aria-expanded={infoOpen}>
-            <Icon name="info" size={18} />
-          </button>
+          <div className="chat-actions-menu-wrap">
+            <button type="button"
+              className={`icon-button chat-actions-trigger ${chatActionsOpen ? 'active' : ''}`}
+              onClick={() => setChatActionsOpen((open) => !open)}
+              aria-label="More conversation options" aria-haspopup="menu"
+              aria-expanded={chatActionsOpen} title="More options">
+              <Icon name="more" size={19} />
+            </button>
+            {chatActionsOpen && (
+              <>
+                <button type="button" className="chat-actions-dismiss"
+                  aria-label="Close conversation options"
+                  onClick={() => setChatActionsOpen(false)} />
+                <div className="chat-actions-menu" role="menu" aria-label="Conversation options">
+                  <button type="button" role="menuitem" onClick={async () => {
+                    setChatActionsOpen(false);
+                    const favorite = !conversation.members.find((member) => member.user.id === me.id)?.isFavorite;
+                    try {
+                      await apiFetch(`/api/v1/conversations/${conversation.id}/favorite`, { method: 'PATCH', body: { favorite } });
+                      window.location.reload();
+                    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not update favourite'); }
+                  }}>
+                    <Icon name="star" size={17} />
+                    <span>{conversation.members.find((member) => member.user.id === me.id)?.isFavorite ? 'Remove from starred' : 'Star conversation'}</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={async () => {
+                    setChatActionsOpen(false);
+                    const secret = window.prompt('Set a secret key (at least 4 characters). Enter it later in the Chats search bar to reveal this chat.');
+                    if (!secret) return;
+                    try {
+                      await apiFetch(`/api/v1/conversations/${conversation.id}/lock`, { method: 'POST', body: { secret } });
+                      window.location.reload();
+                    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not lock chat'); }
+                  }}>
+                    <Icon name="lock" size={17} /><span>Lock conversation</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setChatActionsOpen(false); onToggleArchive();
+                  }}>
+                    <Icon name="archive" size={17} />
+                    <span>{archived ? 'Unarchive conversation' : 'Archive conversation'}</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setChatActionsOpen(false); setSearchOpen((open) => !open);
+                  }}>
+                    <Icon name="search" size={17} />
+                    <span>{searchOpen ? 'Close search' : 'Search conversation'}</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setChatActionsOpen(false); onToggleInfo();
+                  }}>
+                    <Icon name="info" size={17} /><span>Conversation details</span>
+                  </button>
+                  <div className="chat-actions-divider" />
+                  <button type="button" role="menuitem" className="danger" onClick={async () => {
+                    setChatActionsOpen(false);
+                    if (!window.confirm('Delete this chat from your account? Other participants will keep their copy.')) return;
+                    try {
+                      await apiFetch(`/api/v1/conversations/${conversation.id}`, { method: 'DELETE' });
+                      window.location.reload();
+                    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not delete chat'); }
+                  }}>
+                    <Icon name="trash" size={17} /><span>Delete conversation</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

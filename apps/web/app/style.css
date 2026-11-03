@@ -3812,3 +3812,72 @@ mark { background: rgba(255, 205, 64, .35); color: inherit; border-radius: 3px; 
     display: none !important;
   }
 }
+
+/* CONNECTLY_MOBILE_HEADER_AND_AUTH_THEME_UX_V1 */
+.chat-header-actions { display:flex !important; align-items:center; gap:6px !important; flex:0 0 auto; }
+.chat-actions-menu-wrap { position:relative; display:flex; align-items:center; }
+.chat-actions-trigger { border:1px solid var(--line) !important; background:var(--panel-2) !important; border-radius:11px !important; }
+.chat-actions-dismiss { position:fixed; inset:0; z-index:89; border:0; padding:0; background:transparent; cursor:default; }
+.chat-actions-menu {
+  position:absolute; top:calc(100% + 9px); right:0; z-index:90;
+  width:min(250px, calc(100vw - 28px)); padding:7px; border:1px solid var(--line);
+  border-radius:15px; background:var(--panel); box-shadow:0 18px 48px rgba(0,0,0,.24);
+  display:grid; gap:3px; animation:connectly-menu-in .14s ease-out;
+}
+.chat-actions-menu > button {
+  display:flex; align-items:center; gap:12px; width:100%; min-height:42px; padding:9px 11px;
+  border:0; border-radius:9px; background:transparent; color:var(--text); text-align:left;
+  font:inherit; font-size:13px; cursor:pointer;
+}
+.chat-actions-menu > button:hover, .chat-actions-menu > button:focus-visible { outline:none; background:var(--panel-2); }
+.chat-actions-menu > button svg { flex:0 0 auto; color:var(--muted); }
+.chat-actions-menu > button span { flex:1; }
+.chat-actions-menu > button.danger, .chat-actions-menu > button.danger svg { color:var(--danger); }
+.chat-actions-divider { height:1px; margin:4px 5px; background:var(--line); }
+@keyframes connectly-menu-in { from {opacity:0;transform:translateY(-5px) scale(.98)} to {opacity:1;transform:translateY(0) scale(1)} }
+
+/* Theme selector trigger is fixed top-right on phones; popover opens below it. */
+.auth-screen { position:relative; }
+.auth-theme {
+  position:absolute; top:max(14px, env(safe-area-inset-top, 0px));
+  right:max(14px, env(safe-area-inset-right, 0px)); z-index:120;
+  width:auto !important; margin:0 !important; padding:0 !important;
+  background:transparent !important; border:0 !important; box-shadow:none !important;
+}
+.auth-theme .theme-toggle { position:relative; display:inline-flex; width:auto !important; }
+.auth-theme .theme-trigger {
+  width:42px; height:42px; border:1px solid var(--line); border-radius:13px;
+  background:var(--panel); color:var(--text); box-shadow:0 5px 18px rgba(0,0,0,.10);
+}
+.auth-theme .theme-popover {
+  position:absolute !important; top:calc(100% + 8px) !important;
+  right:0 !important; left:auto !important; z-index:130 !important;
+  width:190px !important; max-width:calc(100vw - 28px);
+}
+@media (max-width:900px) {
+  .auth-screen { min-height:100dvh; overflow-x:clip; }
+  .auth-theme {
+    position:fixed !important; top:max(12px, env(safe-area-inset-top, 0px)) !important;
+    right:max(12px, env(safe-area-inset-right, 0px)) !important; margin:0 !important;
+  }
+  .auth-panel {
+    min-height:100dvh;
+    padding:max(70px, calc(env(safe-area-inset-top, 0px) + 64px)) 20px
+      max(28px, env(safe-area-inset-bottom, 0px)) !important;
+    align-content:center;
+  }
+  .auth-brand { margin-bottom:20px !important; }
+}
+@media (max-width:560px) {
+  .chat-header { gap:7px !important; padding-left:10px !important; padding-right:10px !important; }
+  .chat-header-actions { gap:4px !important; }
+  .chat-header-actions > .icon-button, .chat-actions-trigger {
+    width:36px !important; height:36px !important; min-width:36px !important; padding:0 !important;
+  }
+  .chat-title { min-width:0; }
+  .chat-title strong { max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-actions-menu {
+    position:fixed; top:calc(max(58px, env(safe-area-inset-top, 0px) + 50px));
+    right:10px; width:min(270px, calc(100vw - 20px));
+  }
+}
