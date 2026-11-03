@@ -3348,3 +3348,79 @@ mark { background: rgba(255, 205, 64, .35); color: inherit; border-radius: 3px; 
 .report-privacy-note { display:flex; align-items:flex-start; gap:9px; padding:12px 14px; border-radius:10px; background:var(--panel-2); color:var(--muted); font-size:11.5px; line-height:1.55; }
 .report-privacy-note svg { flex-shrink:0; margin-top:1px; }
 @media(max-width:600px) { .report-category-grid { grid-template-columns:1fr; } .report-step { padding:14px; } .account-email-locked { align-items:flex-start; flex-direction:column; } }
+
+
+/* Connectly mobile chat viewport and composer fixes */
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-header,
+.chat-search,
+.composer {
+  flex: 0 0 auto;
+}
+
+.messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+}
+
+@media (max-width: 900px) {
+  .chat-layout,
+  .chat-layout.info-open,
+  .chat-pane {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .chat-pane {
+    overflow: hidden;
+  }
+
+  .messages {
+    min-height: 0;
+    flex: 1 1 0%;
+  }
+
+  .composer {
+    flex-shrink: 0;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+
+  .composer-row {
+    align-items: flex-end;
+  }
+
+  .composer textarea {
+    min-width: 0;
+    max-height: 112px;
+    font-size: 16px;
+  }
+}
+
+/* Use the dynamic viewport on mobile browsers whose address bar changes height. */
+@supports (height: 100dvh) {
+  @media (max-width: 900px) {
+    .app-shell.mobile-main .main-area {
+      min-height: 0;
+      height: 100dvh;
+    }
+  }
+}

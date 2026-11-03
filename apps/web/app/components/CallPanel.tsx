@@ -9,6 +9,20 @@ import { Icon } from './Icon';
 type CallMode = 'audio' | 'video';
 type VideoFilter = 'normal' | 'warm' | 'cool' | 'mono';
 type BackgroundMode = 'none' | 'blur' | 'cafe' | 'home' | 'study' | 'office';
+
+// Keep only one outgoing caller-tune player alive in this browser tab.
+let activeCallerTune: HTMLAudioElement | null = null;
+
+function stopCallerTune(audio?: HTMLAudioElement | null) {
+  const target = audio || activeCallerTune;
+  if (!target) return;
+  target.pause();
+  try { target.currentTime = 0; } catch { /* media may not be ready */ }
+  target.removeAttribute('src');
+  target.load();
+  if (!audio || activeCallerTune === audio) activeCallerTune = null;
+}
+
 const BACKGROUND_IMAGES: Record<Exclude<BackgroundMode, 'none' | 'blur'>, string> = {
   cafe: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1600&q=85',
   home: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=90',
@@ -62,8 +76,8 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
     };
     const detachTrack = (track: any) => track.detach().forEach((element: HTMLElement) => element.remove());
     const markConnected = () => {
-      callerTuneRef.current?.pause();
-      if (callerTuneRef.current) callerTuneRef.current.currentTime = 0;
+      stopCallerTune(callerTuneRef.current);
+      callerTuneRef.current = null;
       if (connectedAtRef.current === null) connectedAtRef.current = Date.now();
       setConnected(true);
       setStatus('Call connected successfully');
@@ -73,21 +87,35 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
     room.on(RoomEvent.TrackUnsubscribed, detachTrack);
     room.on(RoomEvent.ParticipantConnected, markConnected);
     room.on(RoomEvent.ParticipantDisconnected, () => {
+      stopCallerTune(callerTuneRef.current);
+      callerTuneRef.current = null;
       if (room.remoteParticipants.size === 0) {
         if (callIdRef.current) void apiFetch(`/api/v1/calls/${callIdRef.current}/end`, { method: 'POST' }).catch(() => undefined);
         room.disconnect();
         if (!closingRef.current) { closingRef.current = true; onClose(); }
       }
     });
-    room.on(RoomEvent.Disconnected, () => { if (!closingRef.current) setStatus('Call disconnected'); });
+    room.on(RoomEvent.Disconnected, () => {
+      stopCallerTune(callerTuneRef.current);
+      callerTuneRef.current = null;
+      if (!closingRef.current) setStatus('Call disconnected');
+    });
 
     (async () => {
       try {
         const credentials = await apiFetch<{ token: string; serverUrl: string; callId?: string; callerTuneUrl?: string | null }>('/api/v1/calls/token', { method: 'POST', body: { conversationId, mode, notify: notifyParticipants && !forceRelayRetry } });
         if (!active) return;
         if (credentials.callId) callIdRef.current = credentials.callId;
-        if (notifyParticipants && !forceRelayRetry) {
-          try { callerTuneRef.current = new Audio(credentials.callerTuneUrl || '/sounds/default-ring.wav'); callerTuneRef.current.loop = true; callerTuneRef.current.volume = 0.8; await callerTuneRef.current.play(); } catch { /* browser autoplay may require a gesture */ }
+        if (notifyParticipants && !forceRelayRetry && !connectedAtRef.current && !closingRef.current) {
+          try {
+            stopCallerTune();
+            const tune = new Audio(credentials.callerTuneUrl || '/sounds/default-ring.wav');
+            tune.loop = true;
+            tune.volume = 0.8;
+            callerTuneRef.current = tune;
+            activeCallerTune = tune;
+            await tune.play();
+          } catch { /* browser autoplay may require a gesture */ }
         }
         await room.connect(credentials.serverUrl, credentials.token, {
           autoSubscribe: true, maxRetries: 2, websocketTimeout: 20000, peerConnectionTimeout: 30000,
@@ -125,7 +153,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
     })();
     return () => {
       active = false;
-      callerTuneRef.current?.pause(); if (callerTuneRef.current) callerTuneRef.current.currentTime = 0;
+      stopCallerTune(callerTuneRef.current); callerTuneRef.current = null;
       room.removeAllListeners(); room.disconnect(); roomRef.current = null;
       void localVideoTrackRef.current?.stopProcessor?.();
       localVideoTrackRef.current = null; backgroundProcessorRef.current = null;
@@ -183,12 +211,12 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
       try {
         const call = await apiFetch<{ status: string }>(`/api/v1/calls/${callIdRef.current}`);
         if (call.status === 'ACCEPTED') {
-          callerTuneRef.current?.pause();
-          if (callerTuneRef.current) callerTuneRef.current.currentTime = 0;
+          stopCallerTune(callerTuneRef.current);
+          callerTuneRef.current = null;
           if (!connectedAtRef.current) setStatus('Connecting to call…');
         }
         if (['REJECTED', 'NO_RESPONSE', 'ENDED'].includes(call.status)) {
-          callerTuneRef.current?.pause(); roomRef.current?.disconnect();
+          stopCallerTune(callerTuneRef.current); callerTuneRef.current = null; roomRef.current?.disconnect();
           setStatus(call.status === 'NO_RESPONSE' ? 'No response' : call.status === 'REJECTED' ? 'Call rejected' : 'Call ended');
           if (!closingRef.current) { closingRef.current = true; onClose(); }
         }
@@ -213,7 +241,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   async function hangup() {
     if (closingRef.current) return;
     closingRef.current = true;
-    callerTuneRef.current?.pause(); if (callerTuneRef.current) callerTuneRef.current.currentTime = 0;
+    stopCallerTune(callerTuneRef.current); callerTuneRef.current = null;
     if (callIdRef.current) await apiFetch(`/api/v1/calls/${callIdRef.current}/end`, { method: 'POST' }).catch(() => undefined);
     roomRef.current?.disconnect(); onClose();
   }
