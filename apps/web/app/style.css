@@ -3969,3 +3969,32 @@ mark { background: rgba(255, 205, 64, .35); color: inherit; border-radius: 3px; 
   .call-video-tools-enhanced { max-height: min(30dvh, 230px) !important; overflow-y:auto !important; overflow-x:hidden !important; }
   .call-header-actions .icon-button { width:40px; height:40px; }
 }
+
+
+/* CONNECTLY_COMPACT_RINGTONE_NAV_VIDEO_FIX_V1 */
+.audio-github-help {
+  margin: 10px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  min-width: 0;
+}
+.audio-github-help > strong { display: block; margin-bottom: 6px; font-size: 13px; }
+.audio-github-help ol { margin: 6px 0 8px; padding-left: 20px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.audio-github-help p { margin: 7px 0 4px; color: var(--muted); font-size: 12px; }
+.audio-github-help code { display: block; max-width: 100%; padding: 9px 10px; overflow-wrap: anywhere; word-break: break-word; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font-size: 11px; }
+.audio-github-help small { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.content-view, .profile-layout, .profile-layout > .panel { min-width: 0; max-width: 100%; }
+/* Keep the full portrait frame from a phone visible when the other caller uses a laptop. */
+.call-stage-video { display: flex !important; align-items: center !important; justify-content: center !important; background: #050912 !important; overflow: hidden !important; }
+.call-stage-video .call-video-remote { inset: 0 !important; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; object-fit: contain !important; object-position: center !important; }
+.call-stage-video .call-video-local { object-fit: cover !important; }
+@media (min-width: 901px) {
+  .call-stage-video .call-video-remote { margin: auto !important; }
+}
+@media (max-width: 700px) {
+  .audio-github-help { padding: 10px 11px; }
+  .audio-github-help code { font-size: 10px; }
+}

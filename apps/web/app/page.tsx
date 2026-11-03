@@ -75,10 +75,6 @@ function ConnectlyApp() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (window.location.hash === '#free-ringtone-guide' && user) setView('profile');
-  }, [user?.id]);
-
-  useEffect(() => {
     const map = new Map<string, string>();
     if (user) map.set(user.id, user.displayName);
     friends.forEach(({ friend }) => map.set(friend.id, friend.displayName));

@@ -22,7 +22,6 @@ export function ProfileView({ me }: { me: User }) {
   const [emailBusy, setEmailBusy] = useState(false);
   const previewAudio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { void apiFetch<{ ringtoneUrl: string | null; callerTuneUrl: string | null }>('/api/v1/users/me/audio-settings').then((value) => { setRingtoneUrl(value.ringtoneUrl || ''); setCallerTuneUrl(value.callerTuneUrl || ''); }).catch(() => undefined); return () => { previewAudio.current?.pause(); }; }, []);
-  useEffect(() => { if (window.location.hash === '#free-ringtone-guide') { const guide = document.getElementById('free-ringtone-guide') as HTMLDetailsElement | null; if (guide) { guide.open = true; guide.scrollIntoView({ behavior: 'smooth', block: 'start' }); } } }, []);
   async function addAccountEmail(event: React.FormEvent) {
     event.preventDefault();
     if (me.email) return;
@@ -153,24 +152,20 @@ export function ProfileView({ me }: { me: User }) {
           <p className="panel-help">Your ringtone plays when someone calls you. Your caller tune is heard by callers while they wait. Use direct HTTPS links to playable audio files, not Amazon Music, Spotify or YouTube page URLs.</p>
           <form className="profile-form" onSubmit={saveAudio}>
             <label className="field"><span>My ringtone URL</span><input type="url" value={ringtoneUrl} onChange={(event) => setRingtoneUrl(event.target.value)} placeholder="https://.../ringtone.mp3" /></label>
-            <div className="form-actions audio-guide-link-row"><button type="button" className="button ghost" onClick={() => void previewAudioUrl(ringtoneUrl)}>Test ringtone</button><a className="link-button audio-guide-link" href="#free-ringtone-guide" onClick={() => { const guide = document.getElementById("free-ringtone-guide") as HTMLDetailsElement | null; if (guide) guide.open = true; }}>How to create a free ringtone link <span aria-hidden="true">↗</span></a></div>
-            <details className="audio-guide" id="free-ringtone-guide">
-              <summary><strong>Free step-by-step ringtone guide</strong><span>Convert a song on your device and host it at a playable HTTPS URL</span></summary>
-              <div className="audio-guide-content">
-                <p className="panel-help"><strong>Cost: ₹0.</strong> Conversion is done locally on your computer. For a permanent public link, use a free public GitHub repository. A public repository means anyone with the link can access the audio, so upload only music you own or are allowed to share.</p>
-                <ol className="audio-guide-steps">
-                  <li><strong>Choose a song stored on your device.</strong><p>Keep the original audio file on your computer. Connectly cannot use a Spotify, YouTube, Apple Music or other streaming-page URL because those services do not provide a direct audio file URL.</p></li>
-                  <li><strong>Install FFmpeg for free (recommended).</strong><p>Download FFmpeg from <a href="https://ffmpeg.org/download.html" target="_blank" rel="noreferrer">ffmpeg.org/download.html</a>. On Windows, use a trusted Windows build linked from the FFmpeg download page, extract it, and add its <code>bin</code> folder to PATH. Open a new terminal and run <code>ffmpeg -version</code> to confirm it works.</p></li>
-                  <li><strong>Convert the song to MP3.</strong><p>Open a terminal in the folder containing your song and run this command (replace the file names):</p><pre><code>ffmpeg -i "my-song.m4a" -vn -codec:a libmp3lame -b:a 192k "connectly-ringtone.mp3"</code></pre><p>For WAV input, replace <code>my-song.m4a</code> with your WAV filename. MP3 at 192 kbps is a good browser-compatible choice.</p></li>
-                  <li><strong>Trim it to a short ringtone (optional).</strong><p>This example keeps 25 seconds starting at the 30-second mark:</p><pre><code>ffmpeg -ss 00:00:30 -i "my-song.m4a" -t 25 -vn -codec:a libmp3lame -b:a 192k "connectly-ringtone.mp3"</code></pre><p>Change the start time and duration as needed. Keep it short to reduce upload size.</p></li>
-                  <li><strong>Upload the MP3 to a free GitHub repository.</strong><p>Create a free account at <a href="https://github.com/" target="_blank" rel="noreferrer">github.com</a>. Create a new repository, choose <strong>Public</strong>, and create a folder such as <code>audio</code>. Use <strong>Add file → Upload files</strong>, select <code>connectly-ringtone.mp3</code>, then commit the upload. No paid plan or server is required for a small public audio file.</p></li>
-                  <li><strong>Copy the direct raw-file URL.</strong><p>Open the uploaded MP3 in the repository and click <strong>Raw</strong>. Copy the resulting address. It should look like this (replace the uppercase parts with your own values):</p><pre><code>https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/audio/connectly-ringtone.mp3</code></pre><p>Make sure the URL ends in the audio file name and starts with <code>https://raw.githubusercontent.com/</code>, not a GitHub webpage URL.</p></li>
-                  <li><strong>Paste, test and save it in Connectly.</strong><p>Paste that raw URL into <strong>My ringtone URL</strong>, click <strong>Test ringtone</strong>, then click <strong>Save call sounds</strong>. If the preview plays, the link is directly accessible and ready to use as your ringtone.</p></li>
-                </ol>
-                <div className="audio-guide-alt"><strong>No terminal? Use Audacity (free).</strong><p>Install <a href="https://www.audacityteam.org/" target="_blank" rel="noreferrer">Audacity</a>, open your local song, select a 20–30 second section, choose <strong>File → Export Audio</strong>, select MP3, and save it. Then follow the GitHub upload and raw-link steps above.</p></div>
-                <p className="audio-guide-warning">Important: GitHub raw links are public and are intended for personal/test use within GitHub's fair-use limits, not large-scale audio streaming. Do not upload copyrighted songs unless you have permission. If a link stops working or the host blocks playback, upload the MP3 to another HTTPS file host that permits direct audio playback.</p>
-              </div>
-            </details>
+            <div className="form-actions audio-guide-link-row">
+              <button type="button" className="button ghost" onClick={() => void previewAudioUrl(ringtoneUrl)}>Test ringtone</button>
+            </div>
+            <div className="audio-github-help">
+              <strong>Use a song from a public GitHub repository</strong>
+              <ol>
+                <li>Upload your MP3 file to a <strong>public</strong> GitHub repository.</li>
+                <li>Open the uploaded MP3, select <strong>Raw</strong>, and copy its URL.</li>
+                <li>Paste that direct URL into <strong>My ringtone URL</strong>, test it, then save.</li>
+              </ol>
+              <p>Example URL:</p>
+              <code>https://raw.githubusercontent.com/USERNAME/REPOSITORY/main/audio/ringtone.mp3</code>
+              <small>Use audio you own or have permission to share. The public file URL is accessible to anyone.</small>
+            </div>
             <label className="field"><span>My caller tune URL</span><input type="url" value={callerTuneUrl} onChange={(event) => setCallerTuneUrl(event.target.value)} placeholder="https://example.com/caller-tune.mp3" /></label>
             <div className="form-actions"><button type="button" className="button ghost" onClick={() => void previewAudioUrl(callerTuneUrl)}>Test caller tune</button><button className="button primary" type="submit" disabled={audioBusy}>{audioBusy ? 'Saving…' : 'Save call sounds'}</button></div>
           </form>
