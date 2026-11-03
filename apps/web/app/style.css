@@ -3603,3 +3603,212 @@ mark { background: rgba(255, 205, 64, .35); color: inherit; border-radius: 3px; 
   .call-controls .button.danger { min-height: 50px; padding: 0 20px; }
   .call-error { font-size: 13px; }
 }
+
+
+/* CONNECTLY_CALL_IN_CHATSPACE_V1
+   Calls occupy the conversation viewport; they are not a separate browser modal. */
+.chat-pane { position: relative; isolation: isolate; }
+.call-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 30 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  padding: 0 !important;
+  background: var(--panel) !important;
+  backdrop-filter: none !important;
+}
+.call-window {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.call-window-head {
+  flex: 0 0 auto;
+  padding: 8px 4px;
+}
+.call-stage, .call-window-video .call-stage {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+.call-controls {
+  flex: 0 0 auto;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom, 0px)) !important;
+}
+@media (max-width: 900px) {
+  .call-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    background: var(--panel) !important;
+  }
+  .call-window {
+    height: 100% !important;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 12px
+      max(8px, env(safe-area-inset-bottom, 0px)) !important;
+    gap: 8px !important;
+  }
+  .call-window-head { min-height: 42px !important; }
+  .call-stage, .call-window-video .call-stage {
+    min-height: 0 !important;
+    border-radius: 16px !important;
+  }
+  .call-video-tools {
+    max-height: 104px;
+    overflow-y: auto;
+  }
+}
+/* The conversation composer stays anchored; only the message list scrolls. */
+.chat-pane { min-height: 0; }
+.messages { min-height: 0; overscroll-behavior: contain; }
+.composer { flex: 0 0 auto; position: relative; bottom: auto; z-index: 6; }
+@media (max-width: 900px) {
+  .app-shell.mobile-main .main-area { height: 100dvh; min-height: 0; }
+  .chat-layout, .chat-layout.info-open { height: 100%; min-height: 0; }
+  .chat-pane { height: 100%; min-height: 0; overflow: hidden; }
+  .chat-header { flex: 0 0 auto; padding-top: max(8px, env(safe-area-inset-top, 0px)); }
+  .messages {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .composer {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    bottom: auto !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  /* Navigation is reached through the chat back button and the existing sidebar,
+     not a permanent bottom bar consuming message space. */
+  .mobile-tabbar { display: none !important; }
+}
+
+
+/* CONNECTLY_CALL_IN_CHATSPACE_DEPLOY_FIX_V2 */
+/* CallPanel is rendered as a direct child of .chat-pane in ChatView.
+   Make it fill that pane rather than the browser viewport. */
+.chat-pane {
+  position: relative !important;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+}
+.chat-pane > .call-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 80 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--panel, #101722) !important;
+  backdrop-filter: none !important;
+}
+.chat-pane > .call-overlay > .call-window {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: clamp(12px, 2vw, 24px) !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.chat-pane > .call-overlay .call-window-head {
+  flex: 0 0 auto !important;
+}
+.chat-pane > .call-overlay .call-stage {
+  flex: 1 1 0% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+.chat-pane > .call-overlay .call-video-tools {
+  flex: 0 0 auto !important;
+  max-height: 120px;
+  overflow: auto;
+}
+.chat-pane > .call-overlay .call-controls {
+  flex: 0 0 auto !important;
+  padding: 14px 0 max(12px, env(safe-area-inset-bottom, 0px)) !important;
+}
+@media (max-width: 900px) {
+  .app-shell.mobile-main .main-area,
+  .app-shell.mobile-main .chat-layout,
+  .app-shell.mobile-main .chat-pane {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+  }
+  .chat-pane > .call-overlay > .call-window {
+    padding:
+      max(10px, env(safe-area-inset-top, 0px))
+      12px
+      max(10px, env(safe-area-inset-bottom, 0px)) !important;
+    gap: 10px !important;
+  }
+  .chat-pane > .call-overlay .call-stage {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    border-radius: 16px !important;
+  }
+  .chat-pane > .call-overlay .call-video-tools {
+    max-height: 88px;
+    flex-wrap: nowrap;
+  }
+  .chat-pane > .call-overlay .call-controls {
+    justify-content: center !important;
+    gap: 12px !important;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* WhatsApp-style mobile chat: header and composer stay fixed;
+     only message history scrolls. */
+  .app-shell.mobile-main .chat-pane {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+  .app-shell.mobile-main .chat-header {
+    flex: 0 0 auto !important;
+  }
+  .app-shell.mobile-main .messages {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-shell.mobile-main .composer {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    bottom: auto !important;
+    z-index: 10 !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .mobile-tabbar {
+    display: none !important;
+  }
+}
