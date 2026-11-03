@@ -128,7 +128,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   useEffect(() => {
     let active = true;
     closingRef.current = false;
-    const room = new Room({ adaptiveStream: true, dynacast: true });
+    const room = new Room({ adaptiveStream: false, dynacast: true });
     roomRef.current = room;
     if (incomingCallId) callIdRef.current = incomingCallId;
     const attachTrack = (track: any, participant: any) => {
@@ -138,7 +138,11 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
       element.dataset.participant = participant.identity;
       element.dataset.local = participant === room.localParticipant ? 'true' : 'false';
       if (element instanceof HTMLVideoElement) {
-        element.autoplay = true; element.playsInline = true; element.muted = participant === room.localParticipant;
+        element.autoplay = true;
+        element.playsInline = true;
+        element.muted = participant === room.localParticipant;
+        element.disablePictureInPicture = true;
+        element.setAttribute('webkit-playsinline', 'true');
         element.className = `call-video-tile ${participant === room.localParticipant ? 'call-video-local' : 'call-video-remote'} call-filter-${filter}`;
       } else if (element instanceof HTMLAudioElement) {
         element.autoplay = true; element.muted = !speakerEnabledRef.current; element.volume = 1; element.className = 'call-audio-track';

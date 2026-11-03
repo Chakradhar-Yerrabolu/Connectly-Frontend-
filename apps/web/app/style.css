@@ -3881,3 +3881,40 @@ mark { background: rgba(255, 205, 64, .35); color: inherit; border-radius: 3px; 
     right:10px; width:min(270px, calc(100vw - 20px));
   }
 }
+
+
+/* CONNECTLY_REMOTE_VIDEO_FULL_FRAME_V1
+   Preserve the complete camera frame on the receiving device. `cover` crops
+   the sides/top when the video aspect ratio differs from the call stage. */
+.call-stage-video {
+  overflow: hidden !important;
+  background: #050912 !important;
+}
+.call-stage-video .call-video-remote {
+  object-fit: contain !important;
+  object-position: center center !important;
+  background: #050912 !important;
+  image-rendering: auto;
+}
+.call-stage-video .call-video-local {
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+/* Keep remote video legible on narrow phones without cropping the camera view. */
+@media (max-width: 600px) {
+  .call-stage-video .call-video-remote {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+  .call-stage-video .call-video-local {
+    width: min(29%, 150px) !important;
+    height: auto !important;
+    aspect-ratio: 4 / 3 !important;
+    min-width: 88px !important;
+    min-height: 66px !important;
+    max-width: 150px !important;
+    max-height: 120px !important;
+  }
+}
