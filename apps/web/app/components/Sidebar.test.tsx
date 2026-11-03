@@ -35,6 +35,7 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof Sidebar>> 
     onNotifications: vi.fn(),
     onLogout: vi.fn(),
     onLogoutAll: vi.fn(),
+    onUnlockConversation: vi.fn(),
     ...overrides,
   };
   render(

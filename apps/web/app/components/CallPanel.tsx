@@ -163,7 +163,10 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
       if (room.remoteParticipants.size === 0) {
         if (callIdRef.current) void apiFetch(`/api/v1/calls/${callIdRef.current}/end`, { method: 'POST' }).catch(() => undefined);
         room.disconnect();
-        if (!closingRef.current) { closingRef.current = true; onClose(); }
+        if (!closingRef.current) {
+          closingRef.current = true;
+          onClose();
+        }
       }
     });
     room.on(RoomEvent.Disconnected, () => {
@@ -281,7 +284,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   useEffect(() => {
     const timer = window.setInterval(() => { if (connectedAtRef.current) setElapsed(Math.floor((Date.now() - connectedAtRef.current) / 1000)); }, 1000);
     const poll = window.setInterval(async () => {
-      if (!callIdRef.current) return;
+      if (!callIdRef.current || closingRef.current) return;
       try {
         const call = await apiFetch<{ status: string }>(`/api/v1/calls/${callIdRef.current}`);
         if (call.status === 'ACCEPTED') {
@@ -289,12 +292,42 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
           callerTuneRef.current = null;
           if (!connectedAtRef.current) setStatus('Connecting to call…');
         }
+
         if (['REJECTED', 'NO_RESPONSE', 'ENDED'].includes(call.status)) {
-          stopCallerTune(callerTuneRef.current); callerTuneRef.current = null; roomRef.current?.disconnect();
-          setStatus(call.status === 'NO_RESPONSE' ? 'No response' : call.status === 'REJECTED' ? 'Call rejected' : 'Call ended');
-          if (!closingRef.current) { closingRef.current = true; onClose(); }
+          stopCallerTune(callerTuneRef.current);
+          callerTuneRef.current = null;
+          roomRef.current?.disconnect();
+
+          if (call.status === 'NO_RESPONSE') {
+            setStatus('No answer');
+            if ('speechSynthesis' in window) {
+              try {
+                window.speechSynthesis.cancel();
+                const announcement = new SpeechSynthesisUtterance(
+                  'The person you have dialed is not answering. Please try again later.'
+                );
+                announcement.rate = 0.94;
+                announcement.volume = 1;
+                window.speechSynthesis.speak(announcement);
+              } catch {
+                // Announcement is optional; always finish call cleanup.
+              }
+            }
+            if (!closingRef.current) {
+              closingRef.current = true;
+              window.setTimeout(onClose, 3500);
+            }
+          } else {
+            setStatus(call.status === 'REJECTED' ? 'Call rejected' : 'Call ended');
+            if (!closingRef.current) {
+              closingRef.current = true;
+              onClose();
+            }
+          }
         }
-      } catch { /* transient polling errors do not terminate a live call */ }
+      } catch {
+        // Temporary polling errors must not terminate an otherwise active call.
+      }
     }, 2000);
     return () => { window.clearInterval(timer); window.clearInterval(poll); };
   }, [onClose]);
