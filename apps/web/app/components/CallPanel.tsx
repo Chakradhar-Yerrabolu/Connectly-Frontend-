@@ -67,6 +67,30 @@ function stopCallerTune(audio?: HTMLAudioElement | null) {
   if (!audio || activeCallerTune === audio) activeCallerTune = null;
 }
 
+function explainCallError(cause: unknown, mode: CallMode) {
+  const error = cause instanceof Error ? cause : new Error(String(cause ?? 'Unknown error'));
+  const name = (error as Error & { name?: string }).name || '';
+  const detail = error.message || 'Unknown error';
+  const lower = detail.toLowerCase();
+
+  if (name === 'NotAllowedError' || /permission denied|notallowederror/.test(lower)) {
+    return mode === 'video'
+      ? 'Camera or microphone permission was denied. Allow both permissions for this site in your browser settings, then retry.'
+      : 'Microphone permission was denied. Allow microphone access for this site in your browser settings, then retry.';
+  }
+  if (name === 'NotFoundError' || /notfounderror|no device found/.test(lower)) {
+    return mode === 'video' ? 'No camera or microphone was found. Connect or enable the required devices.' : 'No microphone was found. Connect or enable a microphone.';
+  }
+  if (name === 'NotReadableError' || /notreadableerror|could not start video source/.test(lower)) {
+    return 'The camera or microphone is busy or unavailable. Close other apps using it and check the device connection.';
+  }
+  if (name === 'OverconstrainedError') return 'The selected camera or microphone does not support the requested settings. Choose another device.';
+  if (name === 'SecurityError') return 'The browser blocked media access. Open Connectly over HTTPS and allow camera/microphone access.';
+  if (/unauthorized|401|403/.test(lower)) return `LiveKit authorization failed: ${detail}. Verify the LiveKit project URL, API credentials and participant token.`;
+  if (/ice|turn|rtc|websocket|network|timeout|transport|failed to fetch/.test(lower)) return `Could not establish the call media connection: ${detail}. Check the network and LiveKit connectivity.`;
+  return `Call failed: ${detail}`;
+}
+
 const BACKGROUND_IMAGES: Record<Exclude<BackgroundMode, 'none' | 'blur'>, string> = {
   cafe: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1600&q=85',
   home: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=90',
@@ -79,6 +103,8 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   const roomRef = useRef<Room | null>(null);
   const [status, setStatus] = useState('Connecting…');
   const [muted, setMuted] = useState(false);
+  const [speakerEnabled, setSpeakerEnabled] = useState(true);
+  const speakerEnabledRef = useRef(true);
   const [cameraOn, setCameraOn] = useState(mode === 'video');
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
@@ -115,7 +141,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
         element.autoplay = true; element.playsInline = true; element.muted = participant === room.localParticipant;
         element.className = `call-video-tile ${participant === room.localParticipant ? 'call-video-local' : 'call-video-remote'} call-filter-${filter}`;
       } else if (element instanceof HTMLAudioElement) {
-        element.autoplay = true; element.className = 'call-audio-track';
+        element.autoplay = true; element.muted = !speakerEnabledRef.current; element.volume = 1; element.className = 'call-audio-track';
       }
       stageRef.current.appendChild(element);
     };
@@ -274,18 +300,65 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   }, [onClose]);
 
   function clock(seconds: number) { return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; }
+  function toggleSpeaker() {
+    const next = !speakerEnabled;
+    setSpeakerEnabled(next);
+    speakerEnabledRef.current = next;
+    stageRef.current?.querySelectorAll<HTMLAudioElement>('audio.call-audio-track').forEach((audio) => {
+      audio.muted = !next;
+      audio.volume = 1;
+    });
+  }
+
   async function toggleMic() { const next = !muted; setMuted(next); await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); }
   async function toggleCamera() { const next = !cameraOn; setCameraOn(next); await roomRef.current?.localParticipant.setCameraEnabled(next); }
   async function flipCamera() {
-    const nextFront = !frontCamera;
-    const publication = roomRef.current?.localParticipant.getTrackPublication(Track.Source.Camera);
-    const localTrack = publication?.track;
-    if (!localTrack || !('restartTrack' in localTrack)) return;
+    const room = roomRef.current;
+    const publication = room?.localParticipant.getTrackPublication(Track.Source.Camera);
+    const localTrack: any = publication?.track;
+    if (!room || !localTrack) {
+      setError('Camera is not currently available. Turn the camera on before switching cameras.');
+      return;
+    }
+
+    const targetFacing = frontCamera ? 'environment' : 'user';
+    setError('');
     try {
-      await (localTrack as any).restartTrack({ facingMode: nextFront ? 'user' : 'environment' });
-      setFrontCamera(nextFront);
-    } catch (cause) { setError(cause instanceof Error ? `Could not switch camera: ${cause.message}` : 'Could not switch camera on this device.'); }
+      // Keep the existing camera alive until the replacement is acquired.
+      try {
+        await localTrack.restartTrack({
+          facingMode: { ideal: targetFacing },
+          resolution: { width: 1280, height: 720 },
+        });
+      } catch (facingError) {
+        // Some browsers (especially desktop browsers) ignore facingMode.
+        // Select another physical camera instead; do not stop the current track first.
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter((device) => device.kind === 'videoinput');
+        const currentId = localTrack.mediaStreamTrack?.getSettings?.().deviceId;
+        const alternative = cameras.find((device) => device.deviceId !== currentId);
+        if (!alternative) throw facingError;
+        await localTrack.restartTrack({
+          deviceId: { exact: alternative.deviceId },
+          resolution: { width: 1280, height: 720 },
+        });
+      }
+      setFrontCamera((value) => !value);
+      setError('');
+    } catch (cause) {
+      const err = cause as DOMException;
+      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+        setError('Camera permission was denied. Allow camera access for Connectly in your browser/site settings, then try again.');
+      } else if (err?.name === 'NotFoundError' || err?.name === 'OverconstrainedError') {
+        setError('No alternate camera is available on this device. If your device has multiple cameras, check that they are enabled.');
+      } else if (err?.name === 'NotReadableError') {
+        setError('The camera is busy or could not be opened. Close other apps using the camera and try again.');
+      } else {
+        setError(`Could not switch camera: ${err?.message || 'The browser could not start the alternate video source.'}`);
+      }
+    }
   }
+
   async function hangup() {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -313,7 +386,8 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
       </div>}
       {error && <div className="call-error" role="alert"><p>{error}</p>{canRetryTurn && !forceRelayRetry && <button type="button" className="button secondary small" onClick={() => { setError(''); setCanRetryTurn(false); setForceRelayRetry(true); }}>Retry using TURN relay</button>}</div>}
       <footer className="call-controls">
-        <button className={`icon-button ${muted ? 'active' : ''}`} onClick={() => void toggleMic()} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}><Icon name={muted ? 'micOff' : 'mic'} /></button>
+        <button className={`icon-button ${muted ? 'active' : ''}`} onClick={() => void toggleMic()} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute microphone' : 'Mute microphone'}><Icon name={muted ? 'micOff' : 'mic'} /></button>
+        <button className={`icon-button ${!speakerEnabled ? 'active' : ''}`} onClick={toggleSpeaker} aria-label={speakerEnabled ? 'Turn speaker off' : 'Turn speaker on'} title={speakerEnabled ? 'Speaker on' : 'Speaker off'}><Icon name="speaker" /></button>
         {mode === 'video' && <button className={`icon-button ${!cameraOn ? 'active' : ''}`} onClick={() => void toggleCamera()} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}><Icon name="video" /></button>}
         <button className="button danger" onClick={() => void hangup()}><Icon name="phone" /> End call</button>
       </footer>
