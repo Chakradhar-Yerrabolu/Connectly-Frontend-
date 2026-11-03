@@ -7,6 +7,7 @@ import { Avatar, Badge, ThemeSelector } from './ui';
 import { apiFetch } from '../lib/api';
 
 const navItems: { view: View; label: string; icon: IconName }[] = [
+  { view: 'dashboard', label: 'Dashboard', icon: 'spark' },
   { view: 'chats', label: 'Chats', icon: 'chat' },
   { view: 'friends', label: 'Friends', icon: 'users' },
   { view: 'requests', label: 'Friend Requests', icon: 'userPlus' },
@@ -130,6 +131,7 @@ export function Sidebar({
   }, [requests.incoming, query]);
 
   const sectionCopy: Record<string, { title: string; placeholder: string }> = {
+    dashboard: { title: 'Dashboard', placeholder: 'Overview' },
     chats: { title: 'Messages', placeholder: 'Search conversations' },
     friends: { title: 'Friends', placeholder: 'Search friends' },
     requests: { title: 'Pending requests', placeholder: 'Search requests' },

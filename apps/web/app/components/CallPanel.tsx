@@ -404,9 +404,13 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
     roomRef.current?.disconnect(); onClose();
   }
 
-  return <div className="call-overlay" role="dialog" aria-modal="true" aria-label={`${mode} call`}>
-    <section className={`call-window ${mode === 'video' ? 'call-window-video' : 'call-window-audio'}`}>
-      <header className="call-window-head"><div><strong>{mode === 'video' ? 'Video call' : 'Voice call'}</strong><small>{status}{connectedAtRef.current ? ` · ${clock(elapsed)}` : ''}</small></div><button className="icon-button" onClick={() => void hangup()} aria-label="Close call"><Icon name="close" /></button></header>
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const callWindowRef = useRef<HTMLSectionElement>(null);
+  useEffect(() => { if (!isFullscreen) return; const node = callWindowRef.current; if (!node) return; void node.requestFullscreen?.().catch(() => setIsFullscreen(false)); return () => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); }; }, [isFullscreen]);
+
+  return <div className={`call-overlay ${isFullscreen ? 'call-fullscreen-mode' : ''}`} role="dialog" aria-modal="true" aria-label={`${mode} call`}>
+    <section ref={callWindowRef} className={`call-window ${mode === 'video' ? 'call-window-video' : 'call-window-audio'}`}>
+      <header className="call-window-head"><div><strong>{mode === 'video' ? 'Video call' : 'Voice call'}</strong><small>{status}{connectedAtRef.current ? ` · ${clock(elapsed)}` : ''}</small></div><div className="call-header-actions"><button type="button" className="icon-button call-fullscreen-toggle" onClick={() => setIsFullscreen((value) => !value)} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>{isFullscreen ? '↙' : '⛶'}</button><button className="icon-button" onClick={() => void hangup()} aria-label="Close call"><Icon name="close" /></button></div></header>
       <div className={`call-stage ${mode === 'video' ? 'call-stage-video' : 'call-stage-audio'}`} ref={stageRef}>
         {!connected && <div className="call-placeholder">{error || (mode === 'audio' ? 'Calling…' : 'Waiting for the other participant…')}</div>}
         {connected && mode === 'audio' && <div className="call-connected-state"><span className="call-connected-indicator" />Call connected successfully</div>}

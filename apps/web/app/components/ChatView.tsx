@@ -78,7 +78,7 @@ function InlineAttachment({ message }: { message: Message }) {
   return null;
 }
 
-export function MessageBubble({ message, me, showSender, onDelete, onInfo, selected, onSelect, searchTerm }: { message: Message; me: User; showSender: boolean; onDelete: (message: Message) => void; onInfo: (message: Message) => void; selected?: boolean; onSelect?: (message: Message) => void; searchTerm?: string }) {
+export function MessageBubble({ message, me, showSender, onDelete, onInfo, onReply, selected, onSelect, searchTerm }: { message: Message; me: User; showSender: boolean; onDelete: (message: Message) => void; onInfo: (message: Message) => void; onReply: (message: Message) => void; selected?: boolean; onSelect?: (message: Message) => void; searchTerm?: string }) {
   const [mediaBusy, setMediaBusy] = useState(false);
   const mine = message.senderId === me.id;
 
@@ -92,6 +92,7 @@ export function MessageBubble({ message, me, showSender, onDelete, onInfo, selec
 
       <div className={`bubble ${mine ? 'mine' : ''}`}>
         {showSender && !mine && <strong className="bubble-sender">{message.sender?.displayName || message.sender?.username || 'User'}</strong>}
+        {message.replyTo && <div className="message-reply-quote"><strong>{message.replyTo.sender?.displayName || message.replyTo.sender?.username || 'Message'}</strong><span>{message.replyTo.deletedAt ? 'This message was deleted.' : (message.replyTo.body || `[${message.replyTo.type.toLowerCase()}]`)}</span></div>}
 
         {message.deletedAt ? <p className="deleted-message">This message was deleted.</p> : message.body && <p><HighlightedText text={message.body} query={searchTerm || ''} /></p>}
 
@@ -129,6 +130,7 @@ export function MessageBubble({ message, me, showSender, onDelete, onInfo, selec
         )}
 
         <div className="bubble-meta">
+          <button type="button" className="message-reply-action" onClick={() => onReply(message)} aria-label="Reply to message" title="Reply"><Icon name="message" size={13}/> Reply</button>
           <span>{formatTime(message.createdAt)}</span>
           <MessageStatus message={message} mine={mine} />
         </div>
@@ -177,6 +179,7 @@ export function ChatView({
   onCallRequestHandled?: () => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -368,8 +371,9 @@ export function ChatView({
     const value = draft.trim();
     if (!value) return;
 
-    onSend(value);
+    onSend(value, undefined, replyTarget?.id);
     setDraft('');
+    setReplyTarget(null);
 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   }
@@ -735,6 +739,7 @@ export function ChatView({
                   }
                 }}
                 onInfo={(message) => setInfoMessage(message)}
+                onReply={(message) => { setReplyTarget(message); textareaRef.current?.focus(); }}
                 selected={selectedMessages.includes(item.message.id)}
                 searchTerm={search}
                 onSelect={(message) => setSelectedMessages((current) =>
@@ -808,6 +813,7 @@ export function ChatView({
       <footer className="composer">
         {!connected && <div className="composer-offline">Reconnecting… messages may be delayed.</div>}
 
+        {replyTarget && <div className="composer-reply-preview"><div><strong>Replying to {replyTarget.sender?.displayName || replyTarget.sender?.username || 'message'}</strong><span>{replyTarget.body || `[${replyTarget.type.toLowerCase()}]`}</span></div><button type="button" className="icon-button" onClick={() => setReplyTarget(null)} aria-label="Cancel reply"><Icon name="close" size={16}/></button></div>}
         <div className="composer-row">
           <input
             ref={fileInputRef}

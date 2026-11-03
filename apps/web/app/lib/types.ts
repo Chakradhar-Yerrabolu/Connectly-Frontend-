@@ -37,6 +37,8 @@ export type Message = {
   pending?: boolean;
   failed?: boolean;
   deletedAt?: string | null;
+  replyToId?: string | null;
+  replyTo?: Message | null;
 };
 
 export type Conversation = {
@@ -73,4 +75,4 @@ export type Notification = {
   createdAt: string;
 };
 
-export type View = 'chats' | 'friends' | 'requests' | 'groups' | 'archived' | 'calls' | 'settings' | 'profile' | 'notifications';
+export type View = 'dashboard' | 'chats' | 'friends' | 'requests' | 'groups' | 'archived' | 'calls' | 'settings' | 'profile' | 'notifications';
