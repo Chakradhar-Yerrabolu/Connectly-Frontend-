@@ -169,7 +169,7 @@ export function ChatView({
   infoOpen: boolean;
   archived: boolean;
   connected: boolean;
-  onSend: (body: string, attachmentId?: string) => void;
+  onSend: (body: string, attachmentId?: string, replyToMessageId?: string) => void;
   onTyping?: () => void;
   onRetry: () => void;
   onBack: () => void;

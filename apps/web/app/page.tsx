@@ -399,7 +399,7 @@ function ConnectlyApp() {
     void apiFetch(`/api/v1/conversations/${id}/read`, { method: 'POST' }).then(() => loadNotifications()).catch(() => undefined);
   }
 
-  async function sendMessage(body: string, attachmentId?: string) {
+  async function sendMessage(body: string, attachmentId?: string, replyToMessageId?: string) {
     if (!selectedId) return;
     const socket = socketRef.current;
     if (!socket) {
@@ -407,7 +407,7 @@ function ConnectlyApp() {
       return;
     }
     const clientMessageId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-    socket.emit('message:send', { conversationId: selectedId, body, type: 'TEXT', attachmentId, clientMessageId });
+    socket.emit('message:send', { conversationId: selectedId, body, type: 'TEXT', attachmentId, replyToId: replyToMessageId, clientMessageId });
     socket.emit('typing', { conversationId: selectedId, typing: false });
   }
 
@@ -670,9 +670,9 @@ function ConnectlyApp() {
               infoOpen={infoOpen}
               archived={selectedId ? archivedIds.includes(selectedId) : false}
               connected={connected}
-              onSend={(body, attachmentId) => {
+              onSend={(body, attachmentId, replyToMessageId) => {
                 handleDraftActivity();
-                sendMessage(body, attachmentId);
+                sendMessage(body, attachmentId, replyToMessageId);
               }}
               onTyping={handleDraftActivity}
               onRetry={() => {

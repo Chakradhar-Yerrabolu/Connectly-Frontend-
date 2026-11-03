@@ -405,7 +405,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   }
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const callWindowRef = useRef<HTMLSectionElement>(null);
+  const callWindowRef = useRef<HTMLElement>(null);
   useEffect(() => { if (!isFullscreen) return; const node = callWindowRef.current; if (!node) return; void node.requestFullscreen?.().catch(() => setIsFullscreen(false)); return () => { if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); }; }, [isFullscreen]);
 
   return <div className={`call-overlay ${isFullscreen ? 'call-fullscreen-mode' : ''}`} role="dialog" aria-modal="true" aria-label={`${mode} call`}>
