@@ -13,6 +13,50 @@ type BackgroundMode = 'none' | 'blur' | 'cafe' | 'home' | 'study' | 'office';
 // Keep only one outgoing caller-tune player alive in this browser tab.
 let activeCallerTune: HTMLAudioElement | null = null;
 
+
+function describeCallFailure(cause: unknown, mode: CallMode, relayRetry: boolean) {
+  const err = cause instanceof Error ? cause : new Error(String(cause ?? 'Unknown error'));
+  const name = (err as Error & { name?: string }).name || '';
+  const raw = err.message || String(cause ?? '');
+  const message = raw.toLowerCase();
+
+  if (name === 'NotAllowedError' || /permission denied|notallowederror|denied permission/.test(message)) {
+    return { message: mode === 'video'
+      ? 'Camera or microphone permission was denied. Allow camera and microphone access for this site in browser settings, then try again.'
+      : 'Microphone permission was denied. Allow microphone access for this site in browser settings, then try again.',
+      canRetryTurn: false };
+  }
+  if (name === 'NotFoundError' || /notfounderror|no device|device not found/.test(message)) {
+    return { message: mode === 'video'
+      ? 'No usable camera or microphone was found. Connect or enable the devices, then try again.'
+      : 'No usable microphone was found. Connect or enable a microphone, then try again.',
+      canRetryTurn: false };
+  }
+  if (name === 'NotReadableError' || /notreadableerror|could not start video source|device in use/.test(message)) {
+    return { message: 'Your camera or microphone could not be opened. Close other apps or browser tabs using it, check the device connection, and try again.', canRetryTurn: false };
+  }
+  if (name === 'OverconstrainedError' || /overconstrainederror/.test(message)) {
+    return { message: 'The selected camera or microphone does not support the requested settings. Choose another device or turn video off.', canRetryTurn: false };
+  }
+  if (name === 'SecurityError' || /secure context|securityerror/.test(message)) {
+    return { message: 'The browser blocked media access. Open Connectly over HTTPS and allow camera/microphone access.', canRetryTurn: false };
+  }
+  if (/unauthorized|permission denied|401/.test(message)) {
+    return { message: 'LiveKit rejected the call credentials (Unauthorized). Verify LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET belong to the same LiveKit project, and that the participant token is valid and unexpired. TURN retry will not fix authorization.', canRetryTurn: false };
+  }
+  if (/token|forbidden|403/.test(message)) {
+    return { message: `Call authorization failed: ${raw}. Check token generation, room name and participant permissions.`, canRetryTurn: false };
+  }
+  const networkFailure = /ice|turn|rtc|websocket|network|timeout|timed out|connection|disconnected|transport|failed to fetch|could not connect/.test(message);
+  if (relayRetry && networkFailure) {
+    return { message: `The call could not establish a media connection even through TURN relay. Network/ICE detail: ${raw}`, canRetryTurn: false };
+  }
+  if (networkFailure) {
+    return { message: `The call could not establish a media connection. Check your network, then try TURN relay. Detail: ${raw}`, canRetryTurn: true };
+  }
+  return { message: `The call could not start: ${raw}. Check your device permissions and connection, then try again.`, canRetryTurn: false };
+}
+
 function stopCallerTune(audio?: HTMLAudioElement | null) {
   const target = audio || activeCallerTune;
   if (!target) return;
@@ -39,6 +83,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [forceRelayRetry, setForceRelayRetry] = useState(false);
+  const [canRetryTurn, setCanRetryTurn] = useState(false);
   const [connected, setConnected] = useState(false);
   const [filter, setFilter] = useState<VideoFilter>('normal');
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('none');
@@ -145,9 +190,12 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
         else if (active) setStatus(incomingCallId ? 'Joining call…' : 'Ringing · waiting for answer');
       } catch (cause) {
         if (active) {
-          const message = cause instanceof Error ? cause.message : 'Could not connect to the call.';
-          setError(forceRelayRetry ? `${message} TURN relay retry also failed. Check LiveKit TURN/TLS and network access.` : `${message} You can retry using LiveKit TURN relay.`);
+          const failure = describeCallFailure(cause, mode, forceRelayRetry);
+          setError(failure.message);
+          setCanRetryTurn(failure.canRetryTurn && !forceRelayRetry);
           setStatus('Connection failed');
+          stopCallerTune(callerTuneRef.current);
+          callerTuneRef.current = null;
         }
       }
     })();
@@ -263,7 +311,7 @@ export function CallPanel({ conversationId, mode, notifyParticipants, callId: in
         {backgroundBusy && <small className="call-background-status">Applying background…</small>}
         {backgroundError && <small className="call-background-error" role="alert">{backgroundError}</small>}
       </div>}
-      {error && <div className="call-error" role="alert"><p>{error}</p>{!forceRelayRetry && <button type="button" className="button secondary small" onClick={() => { setError(''); setForceRelayRetry(true); }}>Retry using TURN relay</button>}</div>}
+      {error && <div className="call-error" role="alert"><p>{error}</p>{canRetryTurn && !forceRelayRetry && <button type="button" className="button secondary small" onClick={() => { setError(''); setCanRetryTurn(false); setForceRelayRetry(true); }}>Retry using TURN relay</button>}</div>}
       <footer className="call-controls">
         <button className={`icon-button ${muted ? 'active' : ''}`} onClick={() => void toggleMic()} aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}><Icon name={muted ? 'micOff' : 'mic'} /></button>
         {mode === 'video' && <button className={`icon-button ${!cameraOn ? 'active' : ''}`} onClick={() => void toggleCamera()} aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}><Icon name="video" /></button>}
