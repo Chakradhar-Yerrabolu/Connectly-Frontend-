@@ -6,9 +6,9 @@ function authEndpoint(path: string) {
 }
 
 let accessToken: string | null = null;
+let csrfTokenCache: string | null = null;
 let refreshPromise: Promise<AuthResponse | null> | null = null;
 const tokenListeners = new Set<(token: string | null) => void>();
-const SESSION_HINT = 'connectly-session-active';
 
 export type AuthUser = {
   id: string;
@@ -20,7 +20,7 @@ export type AuthUser = {
   profilePictureKey?: string | null;
 };
 
-export type AuthResponse = { accessToken: string; user: AuthUser };
+export type AuthResponse = { accessToken: string; user: AuthUser; csrfToken?: string };
 
 export function getAccessToken() {
   return accessToken;
@@ -28,14 +28,6 @@ export function getAccessToken() {
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
-  if (typeof window !== 'undefined') {
-    try {
-      if (token) window.sessionStorage.setItem(SESSION_HINT, '1');
-      else window.sessionStorage.removeItem(SESSION_HINT);
-    } catch {
-      // Cookie-based authentication still works when browser storage is restricted.
-    }
-  }
   tokenListeners.forEach((listener) => listener(token));
 }
 
@@ -58,6 +50,35 @@ export function readCookie(name: string): string | null {
     }
   }
   return null;
+}
+
+async function obtainCsrfToken(): Promise<string | null> {
+  if (csrfTokenCache) return csrfTokenCache;
+
+  const cookieToken = readCookie('connectly_csrf');
+  if (cookieToken) {
+    csrfTokenCache = cookieToken;
+    return cookieToken;
+  }
+
+  const response = await fetch(authEndpoint('/api/v1/auth/csrf'), {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const data = await parseResponse(response) as { csrfToken?: string } | null;
+
+  if (!response.ok || typeof data?.csrfToken !== 'string' || !data.csrfToken) {
+    throw new ApiError(
+      response.status || 502,
+      data && typeof data === 'object' && 'error' in data
+        ? String((data as { error?: string }).error || 'Could not obtain CSRF token')
+        : 'Could not obtain CSRF token',
+    );
+  }
+
+  csrfTokenCache = data.csrfToken;
+  return csrfTokenCache;
 }
 
 export class ApiError extends Error {
@@ -90,39 +111,49 @@ function isAuthResponse(value: unknown): value is AuthResponse {
 
 export async function refreshSession(): Promise<AuthResponse | null> {
   if (refreshPromise) return refreshPromise;
-  if (typeof window !== 'undefined') {
-    try {
-      if (window.sessionStorage.getItem(SESSION_HINT) !== '1') return null;
-    } catch {
-      // Attempt the refresh request when storage is unavailable.
-    }
-  }
+
   refreshPromise = (async () => {
     try {
       const headers = new Headers();
-      const csrf = readCookie('connectly_csrf');
+      const csrf = await obtainCsrfToken();
       if (csrf) headers.set('X-CSRF-Token', csrf);
+
       const response = await fetch(authEndpoint('/api/v1/auth/refresh'), {
         method: 'POST',
         credentials: 'include',
         headers,
+        cache: 'no-store',
       });
       const data = await parseResponse(response);
+
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           setAccessToken(null);
+          csrfTokenCache = null;
           return null;
         }
-        const errorData = data as { error?: string; code?: string };
-        throw new ApiError(response.status, errorData?.error || 'Could not restore your session', errorData?.code, data);
+
+        const errorData = data as { error?: string; code?: string } | null;
+        throw new ApiError(
+          response.status,
+          errorData?.error || 'Could not restore your session',
+          errorData?.code,
+          data,
+        );
       }
-      if (!isAuthResponse(data)) throw new ApiError(502, 'The session restore response was invalid');
+
+      if (!isAuthResponse(data)) {
+        throw new ApiError(502, 'The session restore response was invalid');
+      }
+
+      if (data.csrfToken) csrfTokenCache = data.csrfToken;
       setAccessToken(data.accessToken);
       return data;
     } finally {
       refreshPromise = null;
     }
   })();
+
   return refreshPromise;
 }
 
@@ -130,8 +161,10 @@ type ApiOptions = Omit<RequestInit, 'body'> & { body?: unknown; skipRefresh?: bo
 
 function createRequestHeaders(headers: HeadersInit | undefined, body: unknown) {
   const requestHeaders = new Headers(headers);
-  if (body !== undefined && !(body instanceof FormData)) requestHeaders.set('Content-Type', 'application/json');
-  const csrf = readCookie('connectly_csrf');
+  if (body !== undefined && !(body instanceof FormData)) {
+    requestHeaders.set('Content-Type', 'application/json');
+  }
+  const csrf = csrfTokenCache || readCookie('connectly_csrf');
   if (csrf) requestHeaders.set('X-CSRF-Token', csrf);
   if (accessToken) requestHeaders.set('Authorization', `Bearer ${accessToken}`);
   return requestHeaders;
@@ -184,6 +217,7 @@ export async function loginWithPassword(username: string, password: string): Pro
     throw new ApiError(response.status, errorData?.error || 'Login failed', errorData?.code, data);
   }
   if (!isAuthResponse(data)) throw new ApiError(502, 'The login response was invalid');
+  if (data.csrfToken) csrfTokenCache = data.csrfToken;
   setAccessToken(data.accessToken);
   return data;
 }
@@ -219,17 +253,27 @@ export async function registerAccount(input: {
 export async function logoutRequest() {
   try {
     const headers = new Headers();
-    const csrf = readCookie('connectly_csrf');
+    const csrf = await obtainCsrfToken().catch(() => null);
     if (csrf) headers.set('X-CSRF-Token', csrf);
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    const response = await fetch(authEndpoint('/api/v1/auth/logout'), { method: 'POST', credentials: 'include', headers });
+    const response = await fetch(authEndpoint('/api/v1/auth/logout'), {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+    });
     if (!response.ok && response.status !== 401 && response.status !== 403) {
       const data = await parseResponse(response);
       const errorData = data as { error?: string; code?: string };
-      throw new ApiError(response.status, errorData?.error || 'Could not sign out', errorData?.code, data);
+      throw new ApiError(
+        response.status,
+        errorData?.error || 'Could not sign out',
+        errorData?.code,
+        data,
+      );
     }
   } finally {
     setAccessToken(null);
+    csrfTokenCache = null;
   }
 }
 
