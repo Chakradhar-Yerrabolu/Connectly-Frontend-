@@ -1,5 +1,10 @@
 export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+// Keep auth cookies first-party by routing auth requests through this Next.js origin.
+function authEndpoint(path: string) {
+  return path.startsWith('/api/v1/auth/') ? path : `${API}${path}`;
+}
+
 let accessToken: string | null = null;
 let refreshPromise: Promise<AuthResponse | null> | null = null;
 const tokenListeners = new Set<(token: string | null) => void>();
@@ -97,7 +102,7 @@ export async function refreshSession(): Promise<AuthResponse | null> {
       const headers = new Headers();
       const csrf = readCookie('connectly_csrf');
       if (csrf) headers.set('X-CSRF-Token', csrf);
-      const response = await fetch(`${API}/api/v1/auth/refresh`, {
+      const response = await fetch(authEndpoint('/api/v1/auth/refresh'), {
         method: 'POST',
         credentials: 'include',
         headers,
@@ -133,7 +138,8 @@ function createRequestHeaders(headers: HeadersInit | undefined, body: unknown) {
 }
 
 async function request<T>(path: string, body: unknown, rest: RequestInit, headers: HeadersInit | undefined) {
-  const response = await fetch(`${API}${path}`, {
+  const requestUrl = path.startsWith('/api/v1/auth/') ? authEndpoint(path) : `${API}${path}`;
+  const response = await fetch(requestUrl, {
     ...rest,
     credentials: 'include',
     headers: createRequestHeaders(headers, body),
@@ -166,7 +172,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
 }
 
 export async function loginWithPassword(username: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API}/api/v1/auth/login`, {
+  const response = await fetch(authEndpoint('/api/v1/auth/login'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -189,7 +195,7 @@ export async function registerAccount(input: {
   email: string;
   gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY';
 }) {
-  const response = await fetch(`${API}/api/v1/auth/register`, {
+  const response = await fetch(authEndpoint('/api/v1/auth/register'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -216,7 +222,7 @@ export async function logoutRequest() {
     const csrf = readCookie('connectly_csrf');
     if (csrf) headers.set('X-CSRF-Token', csrf);
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    const response = await fetch(`${API}/api/v1/auth/logout`, { method: 'POST', credentials: 'include', headers });
+    const response = await fetch(authEndpoint('/api/v1/auth/logout'), { method: 'POST', credentials: 'include', headers });
     if (!response.ok && response.status !== 401 && response.status !== 403) {
       const data = await parseResponse(response);
       const errorData = data as { error?: string; code?: string };
