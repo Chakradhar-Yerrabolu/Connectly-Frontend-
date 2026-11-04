@@ -377,9 +377,19 @@ function ConnectlyApp() {
   }, [incomingCall?.callId]);
 
   function navigate(next: View) {
-    setView(next);
-    setMobilePane('main');
-    if (next !== 'chats') setInfoOpen(false);
+    // Dashboard is an entry point to the Messages screen, not a separate page.
+    // Clear the active conversation so Chats opens in its empty-state layout.
+    const destination: View = next === 'dashboard' ? 'chats' : next;
+    if (next === 'dashboard') {
+      setSelectedId('');
+      setMessages([]);
+      setLoadingMessages(false);
+      setMessageError('');
+      setInfoOpen(false);
+    }
+    setView(destination);
+    setMobilePane(destination === 'chats' ? 'sidebar' : 'main');
+    if (destination !== 'chats') setInfoOpen(false);
   }
 
   function openConversation(id: string) {
@@ -705,9 +715,6 @@ function ConnectlyApp() {
           </div>
         )}
 
-        {view === 'dashboard' && (
-          <section className="content-view connectly-dashboard"><header className="view-head"><div><p className="eyebrow">Overview</p><h1>Dashboard</h1><p className="muted">Your Connectly activity at a glance.</p></div></header><div className="dashboard-stat-grid"><article className="dashboard-stat"><span>Conversations</span><strong>{conversations.length}</strong></article><article className="dashboard-stat"><span>Friends</span><strong>{friends.length}</strong></article><article className="dashboard-stat"><span>Pending requests</span><strong>{requests.incoming.filter((request) => request.status === 'PENDING').length}</strong></article><article className="dashboard-stat"><span>Unread messages</span><strong>{unreadTotal}</strong></article></div><div className="dashboard-shortcuts"><button className="button primary" onClick={() => navigate('chats')}>Open chats</button><button className="button secondary" onClick={() => navigate('friends')}>View friends</button><button className="button secondary" onClick={() => navigate('calls')}>Call history</button></div></section>
-        )}
 
         {view === 'friends' && (
           <FriendsView

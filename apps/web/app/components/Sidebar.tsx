@@ -131,7 +131,6 @@ export function Sidebar({
   }, [requests.incoming, query]);
 
   const sectionCopy: Record<string, { title: string; placeholder: string }> = {
-    dashboard: { title: 'Dashboard', placeholder: 'Overview' },
     chats: { title: 'Messages', placeholder: 'Search conversations' },
     friends: { title: 'Friends', placeholder: 'Search friends' },
     requests: { title: 'Pending requests', placeholder: 'Search requests' },
