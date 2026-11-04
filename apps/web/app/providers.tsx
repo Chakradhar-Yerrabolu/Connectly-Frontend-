@@ -169,6 +169,7 @@ export function useToast() {
 type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
+  authState: 'initializing' | 'authenticated' | 'unauthenticated';
   loading: boolean;
   login: (username: string, password: string) => Promise<AuthUser>;
   register: (input: { username: string; displayName: string; password: string; email: string; gender: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY' }) => Promise<AuthUser>;
@@ -183,7 +184,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(getAccessToken());
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<'initializing' | 'authenticated' | 'unauthenticated'>('initializing');
 
   useEffect(() => {
     const unsubscribe = onAccessTokenChange(setToken);
@@ -194,15 +195,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    refreshSession()
-      .then((result) => {
-        if (active && result) setUser(result.user);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const restore = () => {
+      refreshSession()
+        .then((result) => {
+          if (!active) return;
+          if (result) {
+            setUser(result.user);
+            setAuthState('authenticated');
+          } else {
+            setUser(null);
+            setAuthState('unauthenticated');
+          }
+        })
+        .catch(() => {
+          if (active) retryTimer = setTimeout(restore, 3000);
+        });
+    };
+    restore();
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
 
@@ -214,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const timer = setTimeout(() => {
       refreshSession().then((result) => {
         if (result) setUser(result.user);
-      });
+      }).catch(() => undefined);
     }, delay);
     return () => clearTimeout(timer);
   }, [token]);
@@ -226,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (expiresAt && expiresAt - Date.now() < 5 * 60 * 1000) {
         refreshSession().then((result) => {
           if (result) setUser(result.user);
-        });
+        }).catch(() => undefined);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -236,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const result = await loginWithPassword(username, password);
     setUser(result.user);
+    setAuthState('authenticated');
     return result.user;
   }, []);
 
@@ -244,6 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await registerAccount(input);
       const result = await loginWithPassword(input.username, input.password);
       setUser(result.user);
+      setAuthState('authenticated');
       return result.user;
     },
     [],
@@ -252,11 +267,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setUser(null);
+    setAuthState('unauthenticated');
   }, []);
 
   const logout = useCallback(async () => {
-    await logoutRequest();
-    setUser(null);
+    try {
+      await logoutRequest();
+    } finally {
+      setUser(null);
+      setAuthState('unauthenticated');
+    }
   }, []);
 
   const logoutAll = useCallback(async () => {
@@ -265,6 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setAccessToken(null);
       setUser(null);
+      setAuthState('unauthenticated');
     }
   }, []);
 
@@ -274,8 +295,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, loading, login, register, logout, logoutAll, refreshUser, setUser, clearSession }),
-    [user, token, loading, login, register, logout, logoutAll, refreshUser, clearSession],
+    () => ({ user, token, authState, loading: authState === 'initializing', login, register, logout, logoutAll, refreshUser, setUser, clearSession }),
+    [user, token, authState, login, register, logout, logoutAll, refreshUser, clearSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

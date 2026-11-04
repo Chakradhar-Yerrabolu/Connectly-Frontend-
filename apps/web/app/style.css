@@ -1337,6 +1337,10 @@ ol {
   position: relative;
 }
 
+.mobile-dashboard-link {
+  display: none;
+}
+
 .chat-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -2579,6 +2583,33 @@ ol {
     display: block;
     padding: 0;
     height: 100dvh;
+  }
+
+  .mobile-dashboard-link {
+    display: inline-flex;
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: 12px;
+    z-index: 20;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .content-view {
+    padding-top: 72px;
+  }
+
+  .chat-header {
+    padding-right: 150px;
   }
 
   .sidebar {

@@ -27,9 +27,7 @@ export function setAccessToken(token: string | null) {
 
 export function onAccessTokenChange(listener: (token: string | null) => void) {
   tokenListeners.add(listener);
-  return () => {
-    tokenListeners.delete(listener);
-  };
+  return () => tokenListeners.delete(listener);
 }
 
 export function readCookie(name: string): string | null {
@@ -37,7 +35,13 @@ export function readCookie(name: string): string | null {
   const target = `${name}=`;
   for (const part of document.cookie.split(';')) {
     const value = part.trim();
-    if (value.startsWith(target)) return decodeURIComponent(value.slice(target.length));
+    if (value.startsWith(target)) {
+      try {
+        return decodeURIComponent(value.slice(target.length));
+      } catch {
+        return null;
+      }
+    }
   }
   return null;
 }
@@ -64,26 +68,37 @@ async function parseResponse(response: Response) {
   }
 }
 
+function isAuthResponse(value: unknown): value is AuthResponse {
+  if (!value || typeof value !== 'object') return false;
+  const response = value as Partial<AuthResponse>;
+  return typeof response.accessToken === 'string' && Boolean(response.user);
+}
+
 export async function refreshSession(): Promise<AuthResponse | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    const csrf = readCookie('connectly_csrf');
-    if (!csrf) return null;
     try {
+      const headers = new Headers();
+      const csrf = readCookie('connectly_csrf');
+      if (!csrf) return null;
+      if (csrf) headers.set('X-CSRF-Token', csrf);
       const response = await fetch(`${API}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'X-CSRF-Token': csrf },
+        headers,
       });
+      const data = await parseResponse(response);
       if (!response.ok) {
-        setAccessToken(null);
-        return null;
+        if (response.status === 401 || response.status === 403) {
+          setAccessToken(null);
+          return null;
+        }
+        const errorData = data as { error?: string; code?: string };
+        throw new ApiError(response.status, errorData?.error || 'Could not restore your session', errorData?.code, data);
       }
-      const data = (await parseResponse(response)) as AuthResponse;
+      if (!isAuthResponse(data)) throw new ApiError(502, 'The session restore response was invalid');
       setAccessToken(data.accessToken);
       return data;
-    } catch {
-      return null;
     } finally {
       refreshPromise = null;
     }
@@ -93,48 +108,46 @@ export async function refreshSession(): Promise<AuthResponse | null> {
 
 type ApiOptions = Omit<RequestInit, 'body'> & { body?: unknown; skipRefresh?: boolean };
 
-export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { body, skipRefresh, headers, ...rest } = options;
+function createRequestHeaders(headers: HeadersInit | undefined, body: unknown) {
   const requestHeaders = new Headers(headers);
-  if (body !== undefined && !(body instanceof FormData)) {
-    requestHeaders.set('Content-Type', 'application/json');
-  }
+  if (body !== undefined && !(body instanceof FormData)) requestHeaders.set('Content-Type', 'application/json');
+  const csrf = readCookie('connectly_csrf');
+  if (csrf) requestHeaders.set('X-CSRF-Token', csrf);
   if (accessToken) requestHeaders.set('Authorization', `Bearer ${accessToken}`);
+  return requestHeaders;
+}
 
+async function request<T>(path: string, body: unknown, rest: RequestInit, headers: HeadersInit | undefined) {
   const response = await fetch(`${API}${path}`, {
     ...rest,
     credentials: 'include',
-    headers: requestHeaders,
+    headers: createRequestHeaders(headers, body),
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   });
+  return { response, data: await parseResponse(response) as T };
+}
+
+export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const { body, skipRefresh, headers, ...rest } = options;
+  const { response, data } = await request<T>(path, body, rest, headers);
 
   if (response.status === 401 && !skipRefresh) {
     const refreshed = await refreshSession();
     if (refreshed) {
-      const retryHeaders = new Headers(headers);
-      if (body !== undefined && !(body instanceof FormData)) retryHeaders.set('Content-Type', 'application/json');
-      retryHeaders.set('Authorization', `Bearer ${refreshed.accessToken}`);
-      const retry = await fetch(`${API}${path}`, {
-        ...rest,
-        credentials: 'include',
-        headers: retryHeaders,
-        body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-      });
-      const retryData = await parseResponse(retry);
-      if (!retry.ok) {
-        const errorData = retryData as { error?: string; code?: string };
-        throw new ApiError(retry.status, errorData?.error || 'Request failed', errorData?.code, retryData);
+      const retry = await request<T>(path, body, rest, headers);
+      if (!retry.response.ok) {
+        const errorData = retry.data as { error?: string; code?: string };
+        throw new ApiError(retry.response.status, errorData?.error || 'Request failed', errorData?.code, retry.data);
       }
-      return retryData as T;
+      return retry.data;
     }
   }
 
-  const data = await parseResponse(response);
   if (!response.ok) {
     const errorData = data as { error?: string; code?: string };
     throw new ApiError(response.status, errorData?.error || 'Request failed', errorData?.code, data);
   }
-  return data as T;
+  return data;
 }
 
 export async function loginWithPassword(username: string, password: string): Promise<AuthResponse> {
@@ -149,9 +162,9 @@ export async function loginWithPassword(username: string, password: string): Pro
     const errorData = data as { error?: string; code?: string };
     throw new ApiError(response.status, errorData?.error || 'Login failed', errorData?.code, data);
   }
-  const auth = data as AuthResponse;
-  setAccessToken(auth.accessToken);
-  return auth;
+  if (!isAuthResponse(data)) throw new ApiError(502, 'The login response was invalid');
+  setAccessToken(data.accessToken);
+  return data;
 }
 
 export async function registerAccount(input: {
@@ -183,16 +196,17 @@ export async function registerAccount(input: {
 }
 
 export async function logoutRequest() {
-  const csrf = readCookie('connectly_csrf');
   try {
-    await fetch(`${API}/api/v1/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-    });
+    const headers = new Headers();
+    const csrf = readCookie('connectly_csrf');
+    if (csrf) headers.set('X-CSRF-Token', csrf);
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    const response = await fetch(`${API}/api/v1/auth/logout`, { method: 'POST', credentials: 'include', headers });
+    if (!response.ok && response.status !== 401 && response.status !== 403) {
+      const data = await parseResponse(response);
+      const errorData = data as { error?: string; code?: string };
+      throw new ApiError(response.status, errorData?.error || 'Could not sign out', errorData?.code, data);
+    }
   } finally {
     setAccessToken(null);
   }

@@ -653,6 +653,11 @@ function ConnectlyApp() {
       />
 
       <div className="main-area">
+        {view !== 'dashboard' && (
+          <button type="button" className="mobile-dashboard-link" onClick={() => navigate('dashboard')} aria-label="Dashboard">
+            <Icon name="spark" size={18} /> <span>Dashboard</span>
+          </button>
+        )}
         {view === 'chats' && (
           <div className={`chat-layout ${infoOpen ? 'info-open' : ''}`}>
             <ChatView
