@@ -653,9 +653,9 @@ function ConnectlyApp() {
       />
 
       <div className="main-area">
-        {view !== 'dashboard' && (
+        {view !== 'dashboard' && view !== 'chats' && (
           <button type="button" className="mobile-dashboard-link" onClick={() => navigate('dashboard')} aria-label="Dashboard">
-            <Icon name="spark" size={18} /> <span>Dashboard</span>
+            <Icon name="spark" size={17} /> <span>Dashboard</span>
           </button>
         )}
         {view === 'chats' && (
@@ -686,6 +686,7 @@ function ConnectlyApp() {
                   .finally(() => setLoadingMessages(false));
               }}
               onBack={() => setMobilePane('sidebar')}
+              onDashboard={() => navigate('dashboard')}
               onToggleInfo={() => setInfoOpen((open) => !open)}
               onToggleArchive={() => selectedId && toggleArchive(selectedId)}
               callRequest={callRequest}

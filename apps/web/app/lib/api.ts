@@ -3,6 +3,7 @@ export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 let accessToken: string | null = null;
 let refreshPromise: Promise<AuthResponse | null> | null = null;
 const tokenListeners = new Set<(token: string | null) => void>();
+const SESSION_HINT = 'connectly-session-active';
 
 export type AuthUser = {
   id: string;
@@ -22,6 +23,14 @@ export function getAccessToken() {
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) window.sessionStorage.setItem(SESSION_HINT, '1');
+      else window.sessionStorage.removeItem(SESSION_HINT);
+    } catch {
+      // Cookie-based authentication still works when browser storage is restricted.
+    }
+  }
   tokenListeners.forEach((listener) => listener(token));
 }
 
@@ -76,11 +85,17 @@ function isAuthResponse(value: unknown): value is AuthResponse {
 
 export async function refreshSession(): Promise<AuthResponse | null> {
   if (refreshPromise) return refreshPromise;
+  if (typeof window !== 'undefined') {
+    try {
+      if (window.sessionStorage.getItem(SESSION_HINT) !== '1') return null;
+    } catch {
+      // Attempt the refresh request when storage is unavailable.
+    }
+  }
   refreshPromise = (async () => {
     try {
       const headers = new Headers();
       const csrf = readCookie('connectly_csrf');
-      if (!csrf) return null;
       if (csrf) headers.set('X-CSRF-Token', csrf);
       const response = await fetch(`${API}/api/v1/auth/refresh`, {
         method: 'POST',

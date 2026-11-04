@@ -33,6 +33,59 @@
   --radius-xs: 8px;
 }
 
+.message-reply-quote {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 7px;
+  padding: 6px 9px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px 8px 8px 4px;
+  background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+  color: var(--text);
+  min-width: 0;
+}
+
+.message-reply-quote strong,
+.message-reply-quote span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-reply-quote strong {
+  color: var(--accent);
+  font-size: 10.5px;
+}
+
+.message-reply-quote span {
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.message-reply-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.bubble:hover .message-reply-action,
+.message-reply-action:focus-visible {
+  opacity: 1;
+}
+
+.message-reply-action:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
 [data-theme='dark'] {
   --bg: #0f1216;
   --bg-soft: #14181e;
@@ -65,6 +118,42 @@
   --radius: 16px;
   --radius-sm: 11px;
   --radius-xs: 8px;
+}
+
+.composer-reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.composer-reply-preview > div {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.composer-reply-preview strong {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+
+.composer-reply-preview span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-reply-preview .icon-button {
+  flex: 0 0 32px;
 }
 
 [data-theme='github'] {
@@ -1084,6 +1173,33 @@ ol {
   transition: background 0.16s ease, color 0.16s ease;
 }
 
+.nav-item::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 80;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.nav-item:hover::after,
+.nav-item:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
 .nav-item:hover {
   background: var(--panel-2);
   color: var(--text);
@@ -1372,6 +1488,29 @@ ol {
   border-bottom: 1px solid var(--line);
   min-height: 67px;
   background: var(--panel);
+}
+
+.chat-dashboard-button {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chat-dashboard-button:hover,
+.chat-dashboard-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .mobile-back {
@@ -2592,24 +2731,30 @@ ol {
     right: 12px;
     z-index: 20;
     align-items: center;
-    gap: 7px;
-    min-height: 44px;
-    padding: 9px 13px;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 12px;
     border: 1px solid var(--line);
     border-radius: 999px;
     background: var(--panel);
     color: var(--text);
     box-shadow: var(--shadow-sm);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
   }
 
+  .mobile-dashboard-link:hover,
+  .mobile-dashboard-link:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   .content-view {
-    padding-top: 72px;
+    padding-top: 20px;
   }
 
   .chat-header {
-    padding-right: 150px;
+    padding-right: 12px;
   }
 
   .sidebar {
@@ -2648,6 +2793,18 @@ ol {
 
   .mobile-back {
     display: inline-flex;
+  }
+
+  .chat-dashboard-button {
+    display: inline-flex;
+  }
+
+  .message-reply-action {
+    opacity: 1;
+  }
+
+  .primary-nav .nav-item::after {
+    display: none;
   }
 
   .info-panel {

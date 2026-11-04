@@ -154,6 +154,7 @@ export function ChatView({
   onTyping,
   onRetry,
   onBack,
+  onDashboard,
   onToggleInfo,
   onToggleArchive,
   callRequest,
@@ -173,6 +174,7 @@ export function ChatView({
   onTyping?: () => void;
   onRetry: () => void;
   onBack: () => void;
+  onDashboard: () => void;
   onToggleInfo: () => void;
   onToggleArchive: () => void;
   callRequest?: { mode: 'audio' | 'video'; callId?: string } | null;
@@ -469,7 +471,6 @@ export function ChatView({
         <button type="button" className="icon-button mobile-back" onClick={onBack} aria-label="Back to conversations">
           <Icon name="back" size={20} />
         </button>
-
         <Avatar name={title} pictureKey={other?.profilePictureKey} size={42} online={conversation.type === 'GROUP' ? undefined : isOnline} />
 
         <div className="chat-title">
@@ -485,6 +486,9 @@ export function ChatView({
           </small>
         </div>
 
+        <button type="button" className="chat-dashboard-button" onClick={onDashboard} aria-label="Dashboard">
+          <Icon name="spark" size={16} /> <span>Dashboard</span>
+        </button>
 
         <div className="chat-header-actions">
           <button type="button" className="icon-button" onClick={() => {
